@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Date Calculator</title>
+
+<link href="https://cdn.muicss.com/mui-0.9.7/css/mui.min.css" rel="stylesheet" type="text/css">
+
+<style>
+
+html, body {
+  background: #A9D0F5;
+  height: 100%;
+}
+
+#main {
+  background: white;
+  width: 80%;
+  height: 100%;
+  margin: auto;
+  padding-top: 20px;
+  display: flex;
+  align-items: center;
+}
+
+</style>
+
+<!-- Compiler and Polyfills -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.21.0/babel.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.9.1/polyfill.min.js"></script>
+
+<!-- React + Redux + ReduxSaga -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/15.4.1/react.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/15.4.1/react-dom.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/redux/3.6.0/redux.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.0.1/react-redux.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/redux-saga/0.14.0/redux-saga.min.js"></script>
+
+<!-- Other libraries -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/muicss/0.9.7/react/mui-react.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment-with-locales.min.js"></script>
+
+<script type="text/babel">
+
+/**
+ * Initializations
+ */
+
+moment.locale('ja');
+
+
+/**
+ * Actions
+ */
+
+function createActionCreators(actions) {
+  const creators = {};
+  for (const [key, type] of Object.entries(actions)) {
+    const name = key.toLowerCase().replace(/_(.)/g, (_, c) => c.toUpperCase());
+    creators[name] = payload => ({ type, payload });
+  }
+  return creators;
+}
+
+const PREFIX = '@@example/';
+const DATE_ADD_CHANGED    = PREFIX + 'DATE_ADD_CHANGED';
+const DATE_ADD_CALCULATE  = PREFIX + 'DATE_ADD_CALCULATE';
+const DATE_DIFF_CHANGED   = PREFIX + 'DATE_DIFF_CHANGED';
+const DATE_DIFF_CALCULATE = PREFIX + 'DATE_DIFF_CALCULATE';
+
+const {
+  dateAddChanged, dateAddCalculate,
+  dateDiffChanged, dateDiffCalculate,
+} = createActionCreators({
+  DATE_ADD_CHANGED, DATE_ADD_CALCULATE,
+  DATE_DIFF_CHANGED, DATE_DIFF_CALCULATE,
+});
+
+
+/**
+ * Reducers
+ */
+
+const { combineReducers } = Redux;
+
+function dateAddControl(
+  state = { from: '', span: '', answer: null },
+  { type, payload }
+) {
+  switch (type) {
+    case DATE_ADD_CHANGED:
+      return { ...state, ...payload };
+    case DATE_ADD_CALCULATE:
+      const fromDate = moment(state.from);
+      const number = parseInt(state.span, 10);
+      const answer =
+        fromDate.isValid() && !isNaN(number)
+        ? fromDate.add(state.span, 'days').format('ll')
+        : null;
+      return { ...state, answer };
+    default:
+      return state;
+  }
+}
+
+function dateDiffControl(
+  state = { from: '', to: '', answer: null },
+  { type, payload }
+) {
+  switch (type) {
+    case DATE_DIFF_CHANGED:
+      return { ...state, ...payload };
+    case DATE_DIFF_CALCULATE:
+      const fromDate = moment(state.from);
+      const toDate = moment(state.to);
+      const answer =
+        fromDate.isValid() && toDate.isValid()
+        ? toDate.diff(fromDate, 'days')
+        : null;
+      return { ...state, answer };
+    default:
+      return state;
+  }
+}
+
+const rootReducer = combineReducers({ dateAddControl, dateDiffControl });
+
+
+/**
+ * Sagas
+ */
+
+const { delay } = ReduxSaga;
+const { put, take, call, fork } = ReduxSaga.effects;
+
+function createLazySaga(inputAction, ms, outputActionCreator) {
+  return function* () {
+    let task;
+    while (true) {
+      const { payload } = yield take(inputAction);
+      if (task && task.isRunning()) {
+        task.cancel();
+      }
+      task = yield fork(function* () {
+        yield call(delay, ms);
+        yield put(outputActionCreator(payload));
+      });
+    }
+  };
+}
+
+function* rootSaga() {
+  yield fork(createLazySaga(DATE_ADD_CHANGED, 250, dateAddCalculate));
+  yield fork(createLazySaga(DATE_DIFF_CHANGED, 250, dateDiffCalculate));
+}
+
+
+/**
+ * Components
+ */
+
+const { bindActionCreators } = Redux;
+const { connect } = ReactRedux;
+const { Container, Input, Panel, Form } = mui.react;
+
+const PaddedInput = props => (
+  <Input {...props} style={{ padding: '10px' }} />
+);
+const StaticForm = props => (
+  <Form {...props} onSubmit={e => e.preventDefault()} />
+);
+const CenterBlock = ({ children, ...props }) => (
+  <div {...props} style={{ display: 'table', width: '100%', height: '120px' }}>
+    <div style={{ display: 'table-cell', textAlign: 'center', verticalAlign: 'middle' }}>
+      { children }
+    </div>
+  </div>
+);
+const Large = props => (
+  <span {...props} style={{ fontSize: '40px' }} />
+);
+
+const AddTool = connect(
+  state => state.dateAddControl,
+  dispatch => bindActionCreators({ dateAddChanged }, dispatch)
+)(
+  ({ from, span, answer, dateAddChanged }) => (
+    <Panel>
+      <legend>N日後の日付を計算します</legend>
+      <StaticForm inline={true}>
+        <PaddedInput type="date" value={from} onChange={e => dateAddChanged({from: e.target.value})} />
+        の
+        <PaddedInput type="number" value={span} onChange={e => dateAddChanged({span: e.target.value})} />
+        日後は
+        <CenterBlock>
+          {answer ? <Large>{answer}</Large> : ''}
+        </CenterBlock>
+      </StaticForm>
+    </Panel>
+  )
+);
+
+const DiffTool = connect(
+  state => state.dateDiffControl,
+  dispatch => bindActionCreators({ dateDiffChanged }, dispatch)
+)(
+  ({ from, to, answer, dateDiffChanged }) => (
+    <Panel>
+      <StaticForm inline={true}>
+        <legend>日付の差を計算します</legend>
+        <PaddedInput type="date" value={from} onChange={e => dateDiffChanged({from: e.target.value})} />
+        と
+        <PaddedInput type="date" value={to} onChange={e => dateDiffChanged({to: e.target.value})} />
+        の差は
+        <CenterBlock>
+          {answer ? <Large>{answer}日</Large> : ''}
+        </CenterBlock>
+      </StaticForm>
+    </Panel>
+  )
+);
+
+const App = () => (
+  <Container>
+    <AddTool />
+    <DiffTool />
+  </Container>
+);
+
+
+/**
+ * Executor
+ */
+
+const { createStore, applyMiddleware, compose } = Redux;
+const { Provider } = ReactRedux;
+const createSagaMiddleware = ReduxSaga.default;
+
+const sagaMiddleware = createSagaMiddleware();
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+const store = createStore(rootReducer, composeEnhancers(applyMiddleware(sagaMiddleware)));
+
+sagaMiddleware.run(rootSaga);
+ReactDOM.render(<Provider store={store}><App /></Provider>, document.getElementById('main'));
+
+</script>
+
+<div id="main">
+  <div style="display: table; width: 100%; height: 120px;">
+    <div style="display: table-cell; text-align: center; vertical-align: middle;">
+      <span style="font-size: 40px;">Now Loading ...</span>
+    </div>
+  </div>
+</div>
