@@ -159,8 +159,6 @@ function* rootSaga() {
  * Components
  */
 
-const { bindActionCreators } = Redux;
-const { connect } = ReactRedux;
 const { Container, Input, Panel, Form } = mui.react;
 
 const PaddedInput = props => (
@@ -180,51 +178,54 @@ const Large = props => (
   <span {...props} style={{ fontSize: '40px' }} />
 );
 
-const AddTool = connect(
-  state => state.dateAddControl,
-  dispatch => bindActionCreators({ dateAddChanged }, dispatch)
-)(
-  ({ from, span, answer, dateAddChanged }) => (
-    <Panel>
-      <legend>N日後の日付を計算します</legend>
-      <StaticForm inline={true}>
-        <PaddedInput type="date" value={from} onChange={e => dateAddChanged({from: e.target.value})} />
-        の
-        <PaddedInput type="number" value={span} onChange={e => dateAddChanged({span: e.target.value})} />
-        日後は
-        <CenterBlock>
-          {answer ? <Large>{answer}</Large> : ''}
-        </CenterBlock>
-      </StaticForm>
-    </Panel>
-  )
+const AddTool = ({ from, span, answer, dateAddChanged }) => (
+  <Panel>
+    <legend>N日後の日付を計算します</legend>
+    <StaticForm inline={true}>
+      <PaddedInput type="date" value={from} onChange={e => dateAddChanged({from: e.target.value})} />
+      の
+      <PaddedInput type="number" value={span} onChange={e => dateAddChanged({span: e.target.value})} />
+      日後は
+      <CenterBlock>
+        {answer ? <Large>{answer}</Large> : ''}
+      </CenterBlock>
+    </StaticForm>
+  </Panel>
 );
 
-const DiffTool = connect(
-  state => state.dateDiffControl,
-  dispatch => bindActionCreators({ dateDiffChanged }, dispatch)
-)(
-  ({ from, to, answer, dateDiffChanged }) => (
-    <Panel>
-      <StaticForm inline={true}>
-        <legend>日付の差を計算します</legend>
-        <PaddedInput type="date" value={from} onChange={e => dateDiffChanged({from: e.target.value})} />
-        と
-        <PaddedInput type="date" value={to} onChange={e => dateDiffChanged({to: e.target.value})} />
-        の差は
-        <CenterBlock>
-          {answer ? <Large>{answer}日</Large> : ''}
-        </CenterBlock>
-      </StaticForm>
-    </Panel>
-  )
+const DiffTool = ({ from, to, answer, dateDiffChanged }) => (
+  <Panel>
+    <StaticForm inline={true}>
+      <legend>日付の差を計算します</legend>
+      <PaddedInput type="date" value={from} onChange={e => dateDiffChanged({from: e.target.value})} />
+      と
+      <PaddedInput type="date" value={to} onChange={e => dateDiffChanged({to: e.target.value})} />
+      の差は
+      <CenterBlock>
+        {answer ? <Large>{answer}日</Large> : ''}
+      </CenterBlock>
+    </StaticForm>
+  </Panel>
 );
 
-const App = () => (
-  <Container>
-    <AddTool />
-    <DiffTool />
-  </Container>
+
+/**
+ * Containers
+ */
+
+const { bindActionCreators } = Redux;
+const { connect } = ReactRedux;
+
+const App = connect(
+  state => state,
+  dispatch => bindActionCreators({ dateAddChanged, dateDiffChanged }, dispatch),
+)(
+  ({ dateAddControl, dateDiffControl, dateAddChanged, dateDiffChanged }) => (
+    <Container>
+      <AddTool {...dateAddControl} dateAddChanged={dateAddChanged} />
+      <DiffTool {...dateDiffControl} dateDiffChanged={dateDiffChanged} />
+    </Container>
+  )
 );
 
 
